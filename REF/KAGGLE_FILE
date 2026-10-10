@@ -1,0 +1,103 @@
+import torch, os
+from pathlib import Path
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from torchvision import models, transforms
+from sklearn.metrics import roc_auc_score, accuracy_score
+import numpy as np
+
+BASE = Path("/kaggle/input/datasets/shashwatwork/knee-osteoarthritis-dataset-with-severity")
+# folders: train/0..4, val/0..4
+def kl_to_bin(k): return 0 if int(k) in (0,1) else 1
+
+train_tf = transforms.Compose([
+  transforms.Resize((380,380)),
+  transforms.RandomRotation(15),
+  transforms.RandomHorizontalFlip(),
+  transforms.ColorJitter(0.2,0.2),
+  transforms.ToTensor(),
+  transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225]),
+])
+# rotated / darker knee is still teh same knee. 
+
+
+val_tf = transforms.Compose([
+  transforms.Resize((380,380)),
+  transforms.ToTensor(),
+  transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225]),
+])
+
+class KneeBin(Dataset): ## conveting files into pytorch tensors so models and pytorch can read it. 
+  def __init__(self, root, tf):
+    self.items=[]; self.tf=tf
+    for kl in ["0","1","2","3","4"]: # folder names , KL is kellgren - lawrence graidngs scale for knee osteoarthritis. 
+      for f in (root/kl).glob("*.png"):
+        self.items.append((f, kl_to_bin(kl))) # stores only file path(f) and not actual file (lazy loading) so file is loaded into RAM only when needed. 
+      for f in (root/kl).glob("*.jpg"):
+        self.items.append((f, kl_to_bin(kl)))
+  def __len__(self): return len(self.items)
+  def __getitem__(self,i): # opens PIL to RGB to trsnfom
+    p,y=self.items[i] # when asked for image , p becomes ghe file path and y becomes a binary label. 
+    x=Image.open(p).convert("RGB") # we convert to RGB to avboid grayscale ro RGNA for standard neural network. 
+    return self.tf(x), y # self.tf applies the tranformation 
+
+train_ds=KneeBin(BASE/"train", train_tf)
+val_ds=KneeBin(BASE/"val", val_tf)
+print("train",len(train_ds),"val",len(val_ds))
+
+# balance 3332 (negative images) vs 2446(positive images )
+labels=[y for _,y in train_ds.items] # extarcts all binaries. 
+w0=len(labels)/labels.count(0); w1=len(labels)/labels.count(1)
+samp=[w0 if y==0 else w1 for y in labels] # images are assigned corresponding class weight 
+loader_train=DataLoader(train_ds,batch_size=16,shuffle=False,sampler=WeightedRandomSampler(samp,len(samp)),num_workers=2) # when creating batches, underrepresented classes are vbrught much nore often so my model has equal distrbution while training,
+loader_val=DataLoader(val_ds,batch_size=32,shuffle=False,num_workers=2)
+
+dev="cuda" if torch.cuda.is_available() else "cpu"
+print(dev)
+model=models.densenet121(weights=models.DenseNet121_Weights.IMAGENET1K_V1) # loads pre trained model on images on internet 
+model.classifier=torch.nn.Linear(1024,2) # replace original o/p and makes it to just 2 as we want 
+model.to(dev)
+opt=torch.optim.Adam(model.parameters(),lr=1e-4)
+lossf=torch.nn.CrossEntropyLoss()
+sched=torch.optim.lr_scheduler.StepLR(opt,step_size=10,gamma=0.1)
+scaler=torch.cuda.amp.GradScaler(enabled=(dev=="cuda")) # implemets miXed precision training , scalig graident dyamnimally to prevent mathemetics undeglow and watered down to float16 to conserve gpu vram 
+
+
+# training loop
+best=0
+for ep in range(25): # 25 epochs - model lokks at the dataset exactly once. 
+  model.train(); tot=0
+  for x,y in loader_train: # x is teh image and y is the 0,1 liek heakthy ir arthritis , .to(dev) is basically oushing data and labels to GPU since math can happen only when data and woeights are in the same location and weights are in gpu 
+    x,y=x.to(dev),torch.tensor(y).to(dev) if not torch.is_tensor(y) else y.to(dev)
+    # fix: y from dataset is int
+    opt.zero_grad() # pytorch mathematically accumlates gradients by defaiuly which can interfer with new batch training (remember training is donr is batched with different data from the pool soe we rest with this)
+    with torch.cuda.amp.autocast(enabled=(dev=="cuda")): # this is forward pass with autocast that implemets MIXED PRECISION TRAINING where it tells gpu to do somemath with 15 bith istae dof 32 to fasten teh process woth less memeory usage 
+      out=model(x); loss=lossf(out,y) # out has model outpit and loss is calcuated by coma;triong ot to actaul label ouptt y 
+    scaler.scale(loss).backward(); scaler.step(opt); scaler.update() # .backward so backwardcpass happen, .step(opt) where wights ad biases ataully change and we use scaler because we used auticats, smaller numebr can be round downnto zero so we ultiply it with a large factro to keep numbers safe 
+    tot+=loss.item() # just shows the loss score after each epoch.  
+  # evaluation afyer evry single trainning epoch 
+  model.eval(); ys,ps=[],[]
+  with torch.no_grad(): # turns off history tracking engine of ytorch since we dont need it as we are not backpropagating
+    for x,y in loader_val: 
+      x=x.to(dev) # knee images oushed to GPU so they can interact with weights and y isnt needed sinc we arent calcuating loss function  
+      out=model(x); #forward pass only 
+      p=torch.softmax(out,1)[:,1].cpu().numpy() # outputs into clean probabilities .numpy and.cpu converts it to clean numebr after taking out of gpu 
+      ps.extend(p.tolist()); ys.extend(y.tolist() if torch.is_tensor(y) else y)
+
+      # calculating teh score card. 
+  from sklearn.metrics import roc_auc_score, accuracy_score
+  auc=roc_auc_score(ys,ps); acc=accuracy_score(ys,(np.array(ps)>0.5).astype(int)) # accuarcy core if mode is more than 50 percent sure the round it to 1. 
+  print(f"ep{ep+1} loss{tot:.1f} val AUC{auc:.3f} acc{acc:.3f}")
+
+  sched.step() # my learning rate scheduler, decrese learing rate as more epochs are done 
+  if auc>best: # best working model saved. 
+    best=auc; torch.save(model.state_dict(),"/kaggle/working/best_densenet121_knee.pt")
+    print("saved",best)
+print("best",best)
+
+
+
+
+# layers 
+#dropout layer drops off random neurons since network is prone to memeorizing learhing data and one drastically outperforming neuron can make otehr neuron s not learn and make teh nntework deoendent on thats ingle neuron but only activevdietrngtraining , whe eval eall neurons are online 
+#batch normalization layer  

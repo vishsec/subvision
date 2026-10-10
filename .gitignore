@@ -1,0 +1,7 @@
+.venv/
+data/
+models/*.pt
+*.npz
+__pycache__/
+.ipynb_checkpoints/
+*.md

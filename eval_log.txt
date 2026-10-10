@@ -1,0 +1,4 @@
+(.venv) PS D:\leanmarrow_stack\subvision> python .\test_eval.py           
+test 1656
+AUC 0.945 acc 0.862
+TN 844 FP 91 FN 137 TP 584
