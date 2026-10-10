@@ -5,3 +5,4 @@ models/*.pt
 __pycache__/
 .ipynb_checkpoints/
 *.md
+!README.md
