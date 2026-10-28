@@ -1,0 +1,8 @@
+onnxruntime
+numpy
+pillow
+pydicom
+fastapi
+uvicorn[standard]
+python-multipart
+streamlit

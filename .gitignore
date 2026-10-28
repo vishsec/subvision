@@ -6,3 +6,7 @@ __pycache__/
 .ipynb_checkpoints/
 *.md
 !README.md
+
+serve_log.jsonl
+*.pid
+uvicorn_*.log
