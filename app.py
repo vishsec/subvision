@@ -24,11 +24,20 @@ if uploaded is not None:
     else:
         st.info(f"**{result['label']}**")
 
+    if result.get("uncertainty") == "borderline":
+        st.warning(
+            f"**Borderline** (p in {result['band']}) — queue for radiologist sign-off."
+        )
+
     st.metric("P(KL >= 2)", f"{prob:.4f}")
     c1, c2, c3 = st.columns(3)
     c1.metric("Input", result["input_format"])
     c2.metric("Threshold", result["threshold"])
     c3.metric("Latency", f"{result['latency_ms']['total']:.0f} ms")
+
+    c4, c5 = st.columns(2)
+    c4.caption(f"model `{result.get('model_version', '?')}`")
+    c5.caption(f"request `{result.get('request_id', '?')}`")
 
     with st.expander("Latency breakdown"):
         st.write(result["latency_ms"])

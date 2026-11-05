@@ -50,6 +50,10 @@ def test_predict_png():
     assert 0.0 <= body["prob_kl2plus"] <= 1.0
     assert "sign-off" in body["disclaimer"]
     assert body["input_format"] == "raster"
+    assert body["uncertainty"] in ("borderline", "in-band")
+    assert body["queue_for_signoff"] is (body["uncertainty"] == "borderline")
+    assert body["model_version"]
+    assert len(body["request_id"]) == 16
 
 
 def test_predict_dicom_parity():

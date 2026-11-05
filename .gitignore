@@ -1,12 +1,22 @@
 .venv/
 data/
+data_crop/
 models/*.pt
 *.npz
 __pycache__/
 .ipynb_checkpoints/
 *.md
 !README.md
+!MODEL_CARD.md
+!FAILURES.md
 
 serve_log.jsonl
 *.pid
 uvicorn_*.log
+
+# generated eval artifacts (reproducible via calib_eval.py / drift_check.py / train.py)
+calib_table.csv
+calib_reliability.png
+drift_report.json
+runs.json
+probs_test.npz

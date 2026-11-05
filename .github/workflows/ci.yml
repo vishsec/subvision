@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install serving deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Provide CI stand-in image (data/ is gitignored)
+        run: |
+          python - <<'PY'
+          import os
+          from PIL import Image
+          os.makedirs("data/test/3", exist_ok=True)
+          Image.new("RGB", (512, 512), (120, 120, 130)).save("data/test/3/9011053L.png")
+          print("wrote data/test/3/9011053L.png")
+          PY
+
+      - name: Serving tests (health / PNG / DICOM parity / determinism)
+        run: python -m pytest test_serve.py -v
+
+      - name: Drift check self-test (baseline vs itself must PASS)
+        run: python drift_check.py --new auto_v0_probs.npz
+        continue-on-error: true

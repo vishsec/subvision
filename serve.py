@@ -1,6 +1,7 @@
 import io
 import json
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,10 +14,13 @@ import pydicom
 MODEL_PATH = Path("models/best_densenet121_knee.onnx")
 LOG_PATH = Path("serve_log.jsonl")
 THRESHOLD = 0.5
+MODEL_VERSION = "v0.1.0"
+BORDERLINE_LO = 0.2
+BORDERLINE_HI = 0.8
 
 app = FastAPI(
     title="subvision-knee",
-    version="v1",
+    version=MODEL_VERSION,
     description="Knee OA KL-binary pre-read AID. Not a diagnosis. Needs radiologist sign-off.",
 )
 
@@ -45,7 +49,7 @@ def to_pil(raw: bytes) -> Image.Image:
     return Image.open(io.BytesIO(raw)).convert("RGB")
 
 
-def predict_raw(raw: bytes) -> dict:
+def predict_raw(raw: bytes, request_id: str | None = None) -> dict:
     t0 = time.perf_counter()
     img = to_pil(raw).resize((380, 380), Image.BILINEAR)
     x = np.asarray(img, dtype=np.float32) / 255.0
@@ -56,10 +60,15 @@ def predict_raw(raw: bytes) -> dict:
     e = np.exp(logits - logits.max())
     prob = float((e / e.sum())[1])
     t2 = time.perf_counter()
+    borderline = BORDERLINE_LO <= prob <= BORDERLINE_HI
+    rid = request_id or uuid.uuid4().hex[:16]
     return {
         "prob_kl2plus": round(prob, 4),
         "label": "KL>=2 (OA-positive)" if prob > THRESHOLD else "KL<2 (OA-negative)",
         "threshold": THRESHOLD,
+        "uncertainty": "borderline" if borderline else "in-band",
+        "band": [BORDERLINE_LO, BORDERLINE_HI],
+        "queue_for_signoff": bool(borderline),
         "input_format": "DICOM" if is_dicom(raw) else "raster",
         "disclaimer": "Pre-read aid only. Not a diagnosis. Requires radiologist sign-off.",
         "latency_ms": {
@@ -68,22 +77,36 @@ def predict_raw(raw: bytes) -> dict:
             "total": round((t2 - t0) * 1000, 1),
         },
         "model": MODEL_PATH.name,
+        "model_version": MODEL_VERSION,
+        "request_id": rid,
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": MODEL_PATH.name, "threshold": THRESHOLD}
+    return {
+        "status": "ok",
+        "model": MODEL_PATH.name,
+        "model_version": MODEL_VERSION,
+        "threshold": THRESHOLD,
+        "band": [BORDERLINE_LO, BORDERLINE_HI],
+    }
 
 
 @app.post("/predict")
 def predict(file: UploadFile = File(...)):
     raw = file.file.read()
-    result = predict_raw(raw)
+    rid = uuid.uuid4().hex[:16]
+    result = predict_raw(raw, request_id=rid)
     with LOG_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps({
-            "ts": result["ts"], "file": file.filename,
-            "prob": result["prob_kl2plus"], "ms": result["latency_ms"]["total"],
+            "ts": result["ts"],
+            "request_id": result["request_id"],
+            "model_version": result["model_version"],
+            "file": file.filename,
+            "prob": result["prob_kl2plus"],
+            "uncertainty": result["uncertainty"],
+            "ms": result["latency_ms"]["total"],
         }) + "\n")
     return result

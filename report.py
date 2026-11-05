@@ -9,8 +9,9 @@ DISCLAIMER = "Pre-read only. Needs radiologist sign-off. NOT diagnosis. Demo pro
 
 def build(study, p, thr=0.5, evidence="", kl_hint=""):
   label = "POS" if p > thr else "NEG"
-  # uncertainty: close to threshold OR very low conf max
-  uncertain = abs(p - thr) < 0.15 or (0.35 < p < 0.65)
+  # uncertainty band job-pack #10: borderline if p in [0.2, 0.8] → queue for sign-off
+  borderline = 0.2 <= p <= 0.8
+  uncertain = borderline or abs(p - thr) < 0.15
   conf = p if label == "POS" else 1 - p
   if label == "POS":
     impression = f"OA LIKELY (p={p:.2f} @thr {thr}). {kl_hint}KL2-range pattern.".strip()
@@ -20,11 +21,15 @@ def build(study, p, thr=0.5, evidence="", kl_hint=""):
     rec = "Correlate clinically. Repeat weight-bearing / skyline if high suspicion."
     if uncertain:
       rec += " Flagged UNSURE — refer, do not dismiss."
+  if borderline:
+    rec += " BORDERLINE band [0.2,0.8] — queue for radiologist sign-off."
   findings = "Single AP knee view. JointX v0 binary pre-read (KL 0,1 vs 2,3,4). Evidence overlay attached." if evidence else "Single AP knee view. JointX v0 binary pre-read."
   out = {
     "study": study, "model": "densenet121_knee_v0",
     "threshold": thr, "p_oa": round(float(p), 4), "label": label,
     "confidence": round(float(conf), 4), "uncertain": bool(uncertain),
+    "uncertainty": "borderline" if borderline else "in-band",
+    "queue_for_signoff": bool(borderline),
     "evidence": evidence, "qc": "readable (assumed AP, no implant check)",
   }
   text = (
