@@ -49,7 +49,7 @@ Thresholds @ test: 0.3 → sens 0.867 / spec 0.853 · **0.5 → sens 0.810 / spe
 - **Why it works:** variance reduction — signal is flip-symmetric, orientation-bound noise (position, L/R marker, artifacts) partially cancels in the average. No retraining, same weights, same ONNX graph.
 - **Ship rule (≥3/4 gate metrics): passed** — gate 3/4 (KL1 78.2, −1.1), test 4/4.
 - **Paired bootstrap (10k resamples, `boot_tta.py`):** AUC gain **significant on both splits** — test +0.0050 CI [+0.0023, +0.0079] P≈0.9999; gate +0.0052 CI [+0.0024, +0.0083] P≈1.0000. Accuracy gains positive but **not significant** (P 0.89 / 0.74) — claimed as directional only. hflip-alone (no averaging) was weaker and not significant (P 0.91–0.93) — **averaging is the shipped config for a reason.**
-- **Cost:** local bench n=50 same-day A/B: p50 69.8 ms (off) → 200.6 ms (TTA on); per-call profile ≈2× compute, sustained-load variance observed; cloud figure (single-pass was 87 ms) **to re-bench after deploy**. Toggle: `SUBVISION_TTA=off`.
+- **Cost:** local bench n=50 same-day A/B: p50 69.8 ms (off) → 200.6 ms (TTA on); per-call profile ≈2× compute, sustained-load variance observed; cloud live TTA request **201.2 ms** total (74 decode + 127.2 inference, 2026-11-07, n=1 — single-pass cloud was 87 ms; n=50 cloud bench not run). Toggle: `SUBVISION_TTA=off`.
 - **Not claimed:** no external validation; TTA does not fix systematic errors (correlated passes) and does not change the KL1/KL2 label-noise ceiling.
 
 ## Slice honesty (known gaps)

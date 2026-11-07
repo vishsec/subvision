@@ -35,7 +35,7 @@ Pre-read only. Needs radiologist sign-off. Demo / synthetic-data project, not fo
 - **TTA (v0.2.0):** serving averages base + width-mirrored pass (`serve.py`; response carries `tta: hflip` + `model_version: v0.2.0`). `SUBVISION_TTA=off` env reverts to single-pass for A/B.
 - **API** (`serve.py`, `uvicorn serve:app`): `GET /health`, `POST /predict` — PNG/JPG/DICOM auto-detect (DICM magic bytes), MONOCHROME1 inversion + rescale for DICOM, latency breakdown in every response, request log `serve_log.jsonl`.
 - **Tests** (`test_serve.py`, `pytest` → 4 passed, under TTA): health, PNG predict (prob in [0,1] + disclaimer), PNG↔DICOM parity |ΔP| < 1e-3 on the same image, determinism (p1 == p2).
-- **Bench** (`bench.py`, n=50, same-day local A/B, CPU in-process): TTA off p50 **69.8 ms** total / on p50 **200.6 ms** (sustained-load variance seen; per-call profile ≈2× compute). Streamlit Cloud single-pass was 87 ms — **TTA cloud figure re-bench after deploy**.
+- **Bench** (`bench.py`, n=50, same-day local A/B, CPU in-process): TTA off p50 **69.8 ms** total / on p50 **200.6 ms** (sustained-load variance seen; per-call profile ≈2× compute). Streamlit Cloud live with TTA: **201.2 ms** total (74 decode + 127.2 inference), request `8611663f7d6b4ec7`, 2026-11-07 (single-pass cloud was 87 ms; figure is one live request, n=50 cloud bench not run).
 - **Docker**: `Dockerfile` (python:3.11-slim, onnxruntime only) — build + run + `/health` verified.
 - **Streamlit** (`app.py`, live on Streamlit Cloud): imports `serve` — UI and API are literally the same inference function. Model card + disclaimer + latency breakdown on screen.
 
@@ -75,7 +75,7 @@ All 10 saves live in `gradcam/` (fn1-5 + tp1-5, every pick KL2).
 | Where | What | Cost |
 |---|---|---|
 | Local CPU (bench n=50, TTA on) | ONNX 28.2 MB, p50 **201 ms** total (single-pass A/B: 70 ms) | $0 — your laptop |
-| Streamlit Cloud | same code path; single-pass was p50 **87 ms** total — TTA ≈ 2 passes, re-bench after deploy | free tier |
+| Streamlit Cloud | same code path; **TTA: 201.2 ms total** (74 decode + 127.2 inference, live request 2026-11-07; single-pass was 87 ms) | free tier |
 | Docker image | `python:3.11-slim` + onnxruntime only (no torch) | free |
 | Training (reference only) | DenseNet121 25 ep, Kaggle T4 free GPU | $0 |
 | Per inference @ cloud free tier | ~0.09 s CPU-second | negligible / free tier |
