@@ -1,7 +1,7 @@
 # Model card — subvision v0 (knee OA pre-read)
 
-**Version:** v0.1.0 (`best_densenet121_knee.onnx`, 28.2 MB)  
-**Date:** 2026-11-05  
+**Version:** v0.2.0 (`best_densenet121_knee.onnx`, 28.2 MB + hflip TTA at inference)  
+**Date:** 2026-11-07 (v0.1.0 baseline card: 2026-11-05)  
 **Status:** demo / portfolio. **Not a medical device. Not for diagnosis or commercial use.**
 
 ## Intended use
@@ -17,6 +17,7 @@
 |---|---|
 | Architecture | DenseNet121 (ImageNet pretrained) → Linear(1024, 2) |
 | Export | ONNX, CPU (`onnxruntime`), torch-free serving |
+| Inference (v0.2.0) | **hflip TTA** — avg of base pass + width-mirrored pass (`SUBVISION_TTA=off` to disable; response carries `tta` field) |
 | Input | 380×380 RGB, ImageNet normalize; PNG/JPG or DICOM (auto-detect) |
 | Output | `prob_kl2plus` = P(KL ≥ 2), label @ threshold **0.5** |
 | Training | Binary CE + WeightedRandomSampler, Adam 1e-4, StepLR(10, 0.1), 25 epochs, AMP on GPU |
@@ -33,12 +34,23 @@
 | Split | n | AUC | acc | sens | spec | Notes |
 |---|---|---|---|---|---|---|
 | Val (best) | 826 | 0.940 | 0.881 | — | — | ep24 AUC / ep20–23 acc |
-| Test | 1,656 | **0.945** | **0.862** | 0.810 | 0.903 | TN844 FP91 FN137 TP584 @0.5 |
-| auto_test (gate) | 1,526 | **0.944** | **0.872** | 0.816 | 0.912 | TN802 FP77 FN119 TP528 |
+| Test v0 (single pass) | 1,656 | 0.945 | 0.862 | 0.810 | 0.903 | TN844 FP91 FN137 TP584 @0.5 |
+| **Test v0.2 (shipped, TTA)** | 1,656 | **0.950** | **0.868** | 0.813 | 0.911 | TN852 FP83 FN135 TP586 |
+| auto_test (gate) v0 | 1,526 | 0.944 | 0.872 | 0.816 | 0.912 | TN802 FP77 FN119 TP528 |
+| **auto_test (gate) v0.2 TTA** | 1,526 | **0.949** | **0.875** | 0.824 | 0.912 | TN802 FP77 FN114 TP533 |
 
 Thresholds @ test: 0.3 → sens 0.867 / spec 0.853 · **0.5 → sens 0.810 / spec 0.903** · 0.7 → sens 0.752 / spec 0.947.
 
 **Ablation (M2, closed 2026-11-05):** 5-class (C1) tied v0; joint-crop 5-class (T1) failed (KL2 66.3). Ship rule: neither beat v0 → **v0 stays production**. Middle grades (KL1/KL2) are label-limited; escalate = box or labeling review, not more epochs. Detail: `kaggle_v1_cells.md` (local log).
+
+## TTA (B2, shipped v0.2.0 2026-11-07)
+
+- **Method:** average of base pass + horizontally-flipped pass at inference (knee anatomy is left-right symmetric). vflip/rot180 were evaluated and **degrade** (AUC 0.884/0.879 — implausible anatomy, out-of-distribution) — the control that shows why only hflip ships.
+- **Why it works:** variance reduction — signal is flip-symmetric, orientation-bound noise (position, L/R marker, artifacts) partially cancels in the average. No retraining, same weights, same ONNX graph.
+- **Ship rule (≥3/4 gate metrics): passed** — gate 3/4 (KL1 78.2, −1.1), test 4/4.
+- **Paired bootstrap (10k resamples, `boot_tta.py`):** AUC gain **significant on both splits** — test +0.0050 CI [+0.0023, +0.0079] P≈0.9999; gate +0.0052 CI [+0.0024, +0.0083] P≈1.0000. Accuracy gains positive but **not significant** (P 0.89 / 0.74) — claimed as directional only. hflip-alone (no averaging) was weaker and not significant (P 0.91–0.93) — **averaging is the shipped config for a reason.**
+- **Cost:** local bench n=50 same-day A/B: p50 69.8 ms (off) → 200.6 ms (TTA on); per-call profile ≈2× compute, sustained-load variance observed; cloud figure (single-pass was 87 ms) **to re-bench after deploy**. Toggle: `SUBVISION_TTA=off`.
+- **Not claimed:** no external validation; TTA does not fix systematic errors (correlated passes) and does not change the KL1/KL2 label-noise ceiling.
 
 ## Slice honesty (known gaps)
 
@@ -57,6 +69,26 @@ Thresholds @ test: 0.3 → sens 0.867 / spec 0.853 · **0.5 → sens 0.810 / spe
 4. **Distribution shift** — non-OAI acquisition, pediatric, post-op, implant, wrong view → out of scope; `drift_check.py` monitors score drift on new batches.
 5. **Calibration** — raw softmax is not a clinical probability; see `calib_eval.py` (ECE + reliability).
 
+## Corruption robustness (auto_test n=1,526, `corrupt_eval.py`, 2026-11-05)
+
+Photometric shifts are near-free; structure/noise degradations hurt, and failures skew **false-positive (over-call), not misses**:
+
+| Corruption | AUC | ΔAUC | acc | Δacc | Read |
+|---|---|---|---|---|---|
+| clean | 0.944 | — | 0.872 | — | baseline |
+| brightness 0.7 | 0.944 | +0.000 | 0.875 | +0.003 | invariant |
+| contrast 0.6 | 0.943 | −0.001 | 0.869 | −0.003 | invariant |
+| contrast 0.4 | 0.938 | −0.006 | 0.865 | −0.007 | invariant |
+| jpeg q50 | 0.914 | −0.030 | 0.809 | −0.063 | FP 77→226 |
+| **jpeg q20** | 0.850 | −0.094 | **0.598** | **−0.274** | FP 77→586 (over-call) |
+| noise σ0.05 | 0.836 | −0.108 | 0.765 | −0.107 | FN doubles |
+| **noise σ0.15** | 0.531 | −0.413 | **0.424** | −0.448 | degenerate all-positive (TN 0) |
+| blur r2 | 0.895 | −0.049 | 0.825 | −0.047 | moderate |
+| downscale 4× | 0.878 | −0.066 | 0.803 | −0.069 | moderate (FN up) |
+
+- **Scope:** synthetic corruptions on in-cohort PNGs — not a claim about real portable-device cohorts.
+- **Operational rule:** heavily compressed / noisy input → expect false alarms or degenerate output; reject or re-acquire rather than trust. `drift_check.py` watches batch-level score shifts.
+
 ## Mitigations shipped
 
 - Uncertainty band → borderline queue for sign-off (API + report).
@@ -67,7 +99,7 @@ Thresholds @ test: 0.3 → sens 0.867 / spec 0.853 · **0.5 → sens 0.810 / spe
 
 ## Metrics for interviews (one-liner)
 
-> Knee-OA KL-binary, DenseNet121 — test AUC 0.945 / acc 86.2% (sens 0.81 / spec 0.90, n=1,656) — near published FDA-cleared bars (RBknee 0.88/0.87, KOALA 0.87/0.83), with Grad-CAM + radiologist-sign-off workflow. Aid, never diagnosis.
+> Knee-OA KL-binary, DenseNet121 + hflip TTA — test AUC 0.950 / acc 86.8% (sens 0.81 / spec 0.91, n=1,656; bootstrap CI excludes zero) — near published FDA-cleared bars (RBknee 0.88/0.87, KOALA 0.87/0.83), with Grad-CAM + radiologist-sign-off workflow. Aid, never diagnosis.
 
 ## Contact / repro
 

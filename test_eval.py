@@ -38,23 +38,29 @@ model.classifier = torch.nn.Linear(1024,2)
 model.load_state_dict(torch.load(CKPT, map_location="cpu"))
 model.eval()
 
-all_y, all_p = [], []
+all_y, all_p, all_pt = [], [], []
 with torch.no_grad():
   for x,y in ld:
     out = model(x)
     p = torch.softmax(out,1)[:,1].numpy()
+    pf = torch.softmax(model(torch.flip(x, dims=[3])),1)[:,1].numpy()
     all_p.extend(p.tolist())
+    all_pt.extend(((p + pf) / 2).tolist())
     all_y.extend(y if isinstance(y,list) else y.tolist() if torch.is_tensor(y) else list(y))
 
-ys = np.array(all_y); ps = np.array(all_p)
-pred = (ps>0.5).astype(int)
-acc = (pred==ys).mean()
-order = np.argsort(ps)
-ranks = np.empty_like(order, dtype=float)
-ranks[order] = np.arange(len(ps))+1
-n1 = ys.sum(); n0 = len(ys)-n1
-auc = (ranks[ys==1].sum() - n1*(n1+1)/2) / (n1*n0) if n1 and n0 else 0
-print(f"AUC {auc:.3f} acc {acc:.3f}")
-tn = ((pred==0)&(ys==0)).sum(); fp = ((pred==1)&(ys==0)).sum()
-fn = ((pred==0)&(ys==1)).sum(); tp = ((pred==1)&(ys==1)).sum()
-print(f"TN {tn} FP {fp} FN {fn} TP {tp}")
+ys = np.array(all_y)
+
+def report(ps, tag):
+  pred = (ps>0.5).astype(int)
+  acc = (pred==ys).mean()
+  order = np.argsort(ps)
+  ranks = np.empty_like(order, dtype=float)
+  ranks[order] = np.arange(len(ps))+1
+  n1 = ys.sum(); n0 = len(ys)-n1
+  auc = (ranks[ys==1].sum() - n1*(n1+1)/2) / (n1*n0) if n1 and n0 else 0
+  tn = ((pred==0)&(ys==0)).sum(); fp = ((pred==1)&(ys==0)).sum()
+  fn = ((pred==0)&(ys==1)).sum(); tp = ((pred==1)&(ys==1)).sum()
+  print(f"{tag} AUC {auc:.3f} acc {acc:.3f} TN {tn} FP {fp} FN {fn} TP {tp}")
+
+report(np.array(all_p), "v0    ")
+report(np.array(all_pt), "v0+tta")

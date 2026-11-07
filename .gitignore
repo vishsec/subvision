@@ -12,7 +12,11 @@ __pycache__/
 
 serve_log.jsonl
 *.pid
-uvicorn_*.log
+*.log
+
+# regenerable caches + raw-image staging (X-rays never re-hosted, same rule as data/)
+models/keva_boxes_cache.json
+annotate/
 
 # generated eval artifacts (reproducible via calib_eval.py / drift_check.py / train.py)
 calib_table.csv

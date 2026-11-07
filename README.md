@@ -22,25 +22,27 @@ Pre-read only. Needs radiologist sign-off. Demo / synthetic-data project, not fo
 ## Results (recorded, do not re-run blindly)
 - Val best (Kaggle `subvision_v1`): acc 0.881 (ep20/ep23), AUC 0.940 (ep24).
 - Test (2026-10-08, `test_eval.py`): n=1656, AUC 0.945, acc 0.862 — TN 844 FP 91 FN 137 TP 584 = sens 0.810 / spec 0.903 / prec 0.865.
-- Threshold (Kaggle `thereshold_calc`, 2026-10-09):
+- **Test + hflip TTA (shipped v0.2.0, 2026-11-07): AUC 0.950, acc 0.868** — TN 852 FP 83 FN 135 TP 586 = sens 0.813 / spec 0.911. Gate: 0.949/0.875. Paired bootstrap: AUC gain significant on both splits (test CI [+0.002, +0.008], gate [+0.002, +0.008]); acc gains directional only. Full honesty: `MODEL_CARD.md` → *TTA*.
+- Threshold (Kaggle `thereshold_calc`, 2026-10-09, single-pass):
   - 0.3: acc 0.859 sens 0.867 spec 0.853 (FN 96, FP 137) — don't-miss
   - 0.5: acc 0.862 sens 0.810 spec 0.903 (FN 137, FP 91) — default, conservative
   - 0.7: acc 0.862 sens 0.752 spec 0.947 (FN 179, FP 50) — quiet
 - Grad-CAM (`gradcam.py`, `features.denseblock4`, 5TP+5FN all KL2): TP red on joint margin (e.g. TP2 9007827R p=1.00), FN red off-joint notch/corner (e.g. FN2 9006407R p=0.09). Visuals in `gradcam/`.
-- Portfolio line: "Knee-OA KL-binary, DenseNet121 — test AUC 0.945 / acc 86.2% (sens 0.81/spec 0.90, n=1,656) — near published FDA-cleared benchmarks, with Grad-CAM + radiologist-sign-off workflow. Aid, never diagnosis."
+- Portfolio line: "Knee-OA KL-binary, DenseNet121 + hflip TTA — test AUC 0.950 / acc 86.8% (sens 0.81/spec 0.91, n=1,656, bootstrap CI excludes zero) — near published FDA-cleared benchmarks, with Grad-CAM + radiologist-sign-off workflow. Aid, never diagnosis."
 
-## Serving (M1 ship, 2026-10-28)
-- **ONNX**: `export_onnx.py` → `models/best_densenet121_knee.onnx` (28.2 MB), parity vs torch = 0.000000. Serve path is torch-free (onnxruntime CPU only).
+## Serving (M1 ship 2026-10-28; TTA ship v0.2.0 2026-11-07)
+- **ONNX**: `export_onnx.py` → `models/best_densenet121_knee.onnx` (28.2 MB), parity vs torch = 0.000000 — single-pass **and** TTA-average parity. Serve path is torch-free (onnxruntime CPU only).
+- **TTA (v0.2.0):** serving averages base + width-mirrored pass (`serve.py`; response carries `tta: hflip` + `model_version: v0.2.0`). `SUBVISION_TTA=off` env reverts to single-pass for A/B.
 - **API** (`serve.py`, `uvicorn serve:app`): `GET /health`, `POST /predict` — PNG/JPG/DICOM auto-detect (DICM magic bytes), MONOCHROME1 inversion + rescale for DICOM, latency breakdown in every response, request log `serve_log.jsonl`.
-- **Tests** (`test_serve.py`, `pytest` → 4 passed): health, PNG predict (prob in [0,1] + disclaimer), PNG↔DICOM parity |ΔP| < 1e-3 on the same image, determinism (p1 == p2).
-- **Bench** (`bench.py`, n=50, local CPU in-process): total p50 212.8 ms / p95 231.3 ms; inference p50 201.0 ms / p95 220.6 ms. Streamlit Cloud: 87 ms total (5.4 decode + 81.6 inference).
+- **Tests** (`test_serve.py`, `pytest` → 4 passed, under TTA): health, PNG predict (prob in [0,1] + disclaimer), PNG↔DICOM parity |ΔP| < 1e-3 on the same image, determinism (p1 == p2).
+- **Bench** (`bench.py`, n=50, same-day local A/B, CPU in-process): TTA off p50 **69.8 ms** total / on p50 **200.6 ms** (sustained-load variance seen; per-call profile ≈2× compute). Streamlit Cloud single-pass was 87 ms — **TTA cloud figure re-bench after deploy**.
 - **Docker**: `Dockerfile` (python:3.11-slim, onnxruntime only) — build + run + `/health` verified.
 - **Streamlit** (`app.py`, live on Streamlit Cloud): imports `serve` — UI and API are literally the same inference function. Model card + disclaimer + latency breakdown on screen.
 
-### What to try on the live demo
+### What to try on the live demo (probs = v0.2.0 TTA)
 - `data/test/3/9011053L.png` (KL3) → KL>=2, P ≈ 1.0000
-- `data/test/0/9003175L.png` (KL0) → KL<2, P ≈ 0.0006
-- `data/test/2/9006407R.png` (KL2, known false negative) → KL<2, P = 0.0925 — the honest one.
+- `data/test/0/9003175L.png` (KL0) → KL<2, P ≈ 0.0015
+- `data/test/2/9006407R.png` (KL2, known false negative) → KL<2, P = 0.1643 (0.0925 single-pass — TTA softened the confident miss but did not fix it). The honest one.
 
 ## Visuals (Grad-CAM: orig | heat | overlay, FNs first)
 
@@ -72,8 +74,8 @@ All 10 saves live in `gradcam/` (fn1-5 + tp1-5, every pick KL2).
 ## Operating cost / hardware
 | Where | What | Cost |
 |---|---|---|
-| Local CPU (in-process bench n=50) | ONNX 28.2 MB, p50 **213 ms** / p95 231 ms total (inference p50 201 ms) | $0 — your laptop |
-| Streamlit Cloud | same code path, p50 **87 ms** total (5.4 decode + 81.6 inference) | free tier |
+| Local CPU (bench n=50, TTA on) | ONNX 28.2 MB, p50 **201 ms** total (single-pass A/B: 70 ms) | $0 — your laptop |
+| Streamlit Cloud | same code path; single-pass was p50 **87 ms** total — TTA ≈ 2 passes, re-bench after deploy | free tier |
 | Docker image | `python:3.11-slim` + onnxruntime only (no torch) | free |
 | Training (reference only) | DenseNet121 25 ep, Kaggle T4 free GPU | $0 |
 | Per inference @ cloud free tier | ~0.09 s CPU-second | negligible / free tier |
@@ -106,13 +108,16 @@ Demo project for learning + portfolio. Synthetic/demo data path. Not a medical d
 - `report.py` — deterministic pre-read draft (Findings/Impression/Recommendation + sign-off line)
 - `dicom_loader.py` — X-ray DICOM to 380px RGB for the same pipeline (needs pydicom)
 - `count.py` — per-folder counts
-- `export_onnx.py` — torch → ONNX with parity check (diff 0.000000)
-- `serve.py` — FastAPI: /health, /predict, PNG/DICOM auto-detect, latency, **uncertainty band, model_version + request_id**
+- `export_onnx.py` — torch → ONNX with parity check (diff 0.000000, single + TTA)
+- `tta_eval.py` — flip-variant TTA eval, any split (`--root`), saves per-variant probs
+- `boot_tta.py` — paired bootstrap: is TTA's gain real? (10k resamples, CI + P)
+- `serve.py` — FastAPI: /health, /predict, PNG/DICOM auto-detect, latency, **uncertainty band, model_version + request_id, TTA field**
 - `app.py` — Streamlit UI, imports `serve` (same code path as API)
 - `test_serve.py` — pytest: health, PNG, DICOM parity, determinism
 - `bench.py` — n=50 latency percentiles on CPU
 - `.github/workflows/ci.yml` — pytest on push (health/PNG/DICOM/determinism)
 - `crop.py` / `eval5.py` / `gen_ablation_notebooks.py` — M2 ablation tooling (v0 stays production)
+- `crop_gate.py` / `detect_boxes.py` / `prepare_annotate.py` — C5 knee-detector tooling (KEVA YOLO → QC sheet → detect-vs-fixed crop gate)
 - `Dockerfile` + `requirements.txt` — torch-free serving image
 - `gradcam/` — overlays (fn/tp + crop QC sheets)
 - `models/best_densenet121_knee.onnx` — 28.2 MB, in repo (the served model)

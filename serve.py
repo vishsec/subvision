@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -14,7 +15,8 @@ import pydicom
 MODEL_PATH = Path("models/best_densenet121_knee.onnx")
 LOG_PATH = Path("serve_log.jsonl")
 THRESHOLD = 0.5
-MODEL_VERSION = "v0.1.0"
+MODEL_VERSION = "v0.2.0"
+TTA = os.environ.get("SUBVISION_TTA", "hflip")  # "hflip" (default, B2: 8/8 both splits) or "off" for A/B
 BORDERLINE_LO = 0.2
 BORDERLINE_HI = 0.8
 
@@ -59,6 +61,10 @@ def predict_raw(raw: bytes, request_id: str | None = None) -> dict:
     logits = sess.run(None, {"image": x})[0][0]
     e = np.exp(logits - logits.max())
     prob = float((e / e.sum())[1])
+    if TTA == "hflip":
+        logits_f = sess.run(None, {"image": np.flip(x, 3)})[0][0]
+        e_f = np.exp(logits_f - logits_f.max())
+        prob = (prob + float((e_f / e_f.sum())[1])) / 2
     t2 = time.perf_counter()
     borderline = BORDERLINE_LO <= prob <= BORDERLINE_HI
     rid = request_id or uuid.uuid4().hex[:16]
@@ -78,6 +84,7 @@ def predict_raw(raw: bytes, request_id: str | None = None) -> dict:
         },
         "model": MODEL_PATH.name,
         "model_version": MODEL_VERSION,
+        "tta": TTA,
         "request_id": rid,
         "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
@@ -89,6 +96,7 @@ def health():
         "status": "ok",
         "model": MODEL_PATH.name,
         "model_version": MODEL_VERSION,
+        "tta": TTA,
         "threshold": THRESHOLD,
         "band": [BORDERLINE_LO, BORDERLINE_HI],
     }

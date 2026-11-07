@@ -44,14 +44,14 @@ if uploaded is not None:
 
     st.warning(result["disclaimer"])
 
-with st.expander("Model card"):
-    st.markdown(
-        """
+    with st.expander("Model card"):
+        st.markdown(
+            """
 - **Task**: knee osteoarthritis grading, KL 0-1 (negative) vs KL 2-4 (positive)
-- **Architecture**: DenseNet121, exported to ONNX (28.2 MB), CPU inference
-- **Test set**: n=1,656 — AUC 0.945, accuracy 86.2%, sensitivity 0.81, specificity 0.90
+- **Architecture**: DenseNet121, exported to ONNX (28.2 MB), CPU inference, **hflip TTA** (avg of base + mirrored pass)
+- **Test set**: n=1,656 — AUC 0.950, accuracy 86.8%, sensitivity 0.81, specificity 0.91 (with TTA; bootstrap CI excludes zero)
 - **Input**: PNG/JPG or DICOM, resized to 380x380, ImageNet normalization
 - **Known limits**: single-view X-rays; weakest on borderline grades (KL1/KL2, 87% of errors); needs local validation and radiologist sign-off before any clinical use
 - **Repo**: this app is the same code path as the tested FastAPI service (pytest: health, PNG/DICOM parity, determinism)
 """
-    )
+        )
