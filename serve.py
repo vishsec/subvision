@@ -41,7 +41,11 @@ def dicom_to_pil(raw: bytes) -> Image.Image:
     if getattr(dcm, "PhotometricInterpretation", "MONOCHROME2") == "MONOCHROME1":
         arr = arr.max() - arr
     lo, hi = float(arr.min()), float(arr.max())
-    arr = (arr - lo) / (hi - lo + 1e-6) * 255.0
+    if hi > lo:
+        arr = (arr - lo) / (hi - lo + 1e-6) * 255.0
+    elif hi > 255.0:  # uniform high-bit-depth: scale by max instead of collapsing to black
+        arr = arr / hi * 255.0
+    # uniform 8-bit field: keep pixel value as-is (was: min-max degenerated to all-zero)
     return Image.fromarray(arr.astype(np.uint8), mode="L").convert("RGB")
 
 

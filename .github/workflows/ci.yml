@@ -26,7 +26,7 @@ jobs:
           import os
           from PIL import Image
           os.makedirs("data/test/3", exist_ok=True)
-          Image.new("RGB", (512, 512), (120, 120, 130)).save("data/test/3/9011053L.png")
+          Image.new("L", (512, 512), 121).save("data/test/3/9011053L.png")  # true grayscale, like an X-ray (RGB tint breaks DICOM L-parity)
           print("wrote data/test/3/9011053L.png")
           PY
 
