@@ -3,6 +3,7 @@ numpy
 pillow
 pydicom
 fastapi
+httpx
 uvicorn[standard]
 python-multipart
 streamlit
