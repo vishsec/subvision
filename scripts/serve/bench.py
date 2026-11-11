@@ -1,5 +1,8 @@
 import statistics
+import sys
+from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # repo root, so `import serve` works from anywhere
 import serve
 
 raw = open("data/test/3/9011053L.png", "rb").read()

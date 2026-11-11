@@ -34,5 +34,5 @@ jobs:
         run: python -m pytest test_serve.py -v
 
       - name: Drift check self-test (baseline vs itself must PASS)
-        run: python drift_check.py --new auto_v0_probs.npz
+        run: python scripts/eval/drift_check.py --new auto_v0_probs.npz
         continue-on-error: true

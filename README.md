@@ -17,7 +17,7 @@ Pre-read only. Needs radiologist sign-off. Demo / synthetic-data project, not fo
 | val | 328 | 153 | 212 | 106 | 27 | 826 | 481 | 345 |
 | test | 639 | 296 | 447 | 223 | 51 | 1656 | 935 | 721 |
 | auto_test | 604 | 275 | 403 | 200 | 44 | 1526 | 879 | 647 |
-- `count.py` reproduces counts. Train on Kaggle GPU, eval local CPU or Kaggle.
+- `scripts/data/count.py` reproduces counts. Train on Kaggle GPU, eval local CPU or Kaggle.
 
 ## Results (recorded, do not re-run blindly)
 - Val best (Kaggle `subvision_v1`): acc 0.881 (ep20/ep23), AUC 0.940 (ep24).
@@ -95,46 +95,64 @@ No age/sex/view metadata in data → **no demographic slices**. Per-KL is the on
 Demo project for learning + portfolio. Synthetic/demo data path. Not a medical device. Not for diagnosis, triage, or commercial use. Any future product needs licensed radiologist sign-off, DPDP consent, and regulatory clearance.
 
 ## Files in repo
+
+Root = serving stack only (what Docker / CI / Streamlit pin). Everything else lives in `scripts/` by job:
+
+```
+subvision/
+├── app.py  serve.py  test_serve.py      # serving stack (root, pinned)
+├── scripts/
+│   ├── data/    count, crop, detect_boxes, prepare_annotate
+│   ├── train/   train, export_onnx, gen_*_notebooks
+│   ├── eval/    test_eval, auto_eval, tta_eval, thresh_eval, perkl_eval,
+│   │            calib_eval, eval5, corrupt_eval, drift_check, ensemble,
+│   │            boot_tta, crop_gate
+│   ├── viz/     gradcam, report
+│   └── serve/   bench, dicom_loader
+├── models/  gradcam/  annotate/  data/(gitignored)  REF/
+└── MODEL_CARD.md  FAILURES.md  PROGRESS.md
+```
+
 - `MODEL_CARD.md` — formal model card (intended use, evals, slice honesty, limits)
 - `FAILURES.md` — failure taxonomy for interviews (when it breaks and why)
-- `train.py` — reproduce v0 recipe; appends `runs.json` (config + metrics + git hash)
-- `calib_eval.py` — ECE + reliability on saved probs (`auto_v0_probs.npz` / `probs_test.npz`) → `calib_table.csv` + `calib_reliability.png`
-- `drift_check.py` — new batch vs baseline (PSI + mean-p shift) → `drift_report.json`
-- `test_eval.py` — eval @ 0.5 (slow on CPU, ~10+ min full test; use Kaggle for speed)
-- `thresh_eval.py` — single pass, table 0.3/0.5/0.7 + saves `probs_test.npz`
-- `auto_eval.py` — gate eval on `auto_test/` + saves `auto_v0_probs.npz`
-- `perkl_eval.py` — paste as Kaggle cell for per KL table (fix ROOT/CKPT paths)
-- `gradcam.py` — 5TP+5FN overlays to `gradcam/` (fast local, ~1-2 min)
-- `report.py` — deterministic pre-read draft (Findings/Impression/Recommendation + sign-off line)
-- `dicom_loader.py` — X-ray DICOM to 380px RGB for the same pipeline (needs pydicom)
-- `count.py` — per-folder counts
-- `export_onnx.py` — torch → ONNX with parity check (diff 0.000000, single + TTA)
-- `tta_eval.py` — flip-variant TTA eval, any split (`--root`), saves per-variant probs
-- `boot_tta.py` — paired bootstrap: is TTA's gain real? (10k resamples, CI + P)
+- `scripts/train/train.py` — reproduce v0 recipe; appends `runs.json` (config + metrics + git hash)
+- `scripts/eval/calib_eval.py` — ECE + reliability on saved probs (`auto_v0_probs.npz` / `probs_test.npz`) → `calib_table.csv` + `calib_reliability.png`
+- `scripts/eval/drift_check.py` — new batch vs baseline (PSI + mean-p shift) → `drift_report.json`
+- `scripts/eval/test_eval.py` — eval @ 0.5 (slow on CPU, ~10+ min full test; use Kaggle for speed)
+- `scripts/eval/thresh_eval.py` — single pass, table 0.3/0.5/0.7 + saves `probs_test.npz`
+- `scripts/eval/auto_eval.py` — gate eval on `auto_test/` + saves `auto_v0_probs.npz`
+- `scripts/eval/perkl_eval.py` — paste as Kaggle cell for per KL table (fix ROOT/CKPT paths)
+- `scripts/viz/gradcam.py` — 5TP+5FN overlays to `gradcam/` (fast local, ~1-2 min)
+- `scripts/viz/report.py` — deterministic pre-read draft (Findings/Impression/Recommendation + sign-off line)
+- `scripts/serve/dicom_loader.py` — X-ray DICOM to 380px RGB for the same pipeline (needs pydicom)
+- `scripts/data/count.py` — per-folder counts
+- `scripts/train/export_onnx.py` — torch → ONNX with parity check (diff 0.000000, single + TTA)
+- `scripts/eval/tta_eval.py` — flip-variant TTA eval, any split (`--root`), saves per-variant probs
+- `scripts/eval/boot_tta.py` — paired bootstrap: is TTA's gain real? (10k resamples, CI + P)
 - `serve.py` — FastAPI: /health, /predict, PNG/DICOM auto-detect, latency, **uncertainty band, model_version + request_id, TTA field**
 - `app.py` — Streamlit UI, imports `serve` (same code path as API)
 - `test_serve.py` — pytest: health, PNG, DICOM parity, determinism
-- `bench.py` — n=50 latency percentiles on CPU
+- `scripts/serve/bench.py` — n=50 latency percentiles on CPU
 - `.github/workflows/ci.yml` — pytest on push (health/PNG/DICOM/determinism)
-- `crop.py` / `eval5.py` / `gen_ablation_notebooks.py` — M2 ablation tooling (v0 stays production)
-- `crop_gate.py` / `detect_boxes.py` / `prepare_annotate.py` — C5 knee-detector tooling (KEVA YOLO → QC sheet → detect-vs-fixed crop gate)
+- `scripts/eval/eval5.py` + `scripts/train/gen_ablation_notebooks.py` — M2 ablation tooling (v0 stays production)
+- `scripts/eval/crop_gate.py` / `scripts/data/detect_boxes.py` / `scripts/data/prepare_annotate.py` — C5 knee-detector tooling (KEVA YOLO → QC sheet → detect-vs-fixed crop gate)
 - `Dockerfile` + `requirements.txt` — torch-free serving image
 - `gradcam/` — overlays (fn/tp + crop QC sheets)
 - `models/best_densenet121_knee.onnx` — 28.2 MB, in repo (the served model)
 - `models/best_densenet121_knee.pt` — local only, excluded from repo (lives on Kaggle dataset)
 - Extended logs (numbers, build notes, checklists) stay local only, not in repo.
 
-## Run
+## Run (always from repo root — scripts use cwd-relative paths)
 ```powershell
 .\.venv\Scripts\Activate.ps1
-python .\test_eval.py             # full test @ 0.5
-python .\auto_eval.py             # gate eval + auto_v0_probs.npz
-python .\calib_eval.py            # ECE + reliability (job-pack #2)
-python .\drift_check.py           # batch drift vs baseline (job-pack #13)
-python .\gradcam.py               # visuals, fast
-python .\report.py --demo         # sample drafts, instant
-python -m pytest test_serve.py -q # serving tests (4)
-uvicorn serve:app --port 8000     # API
-streamlit run app.py              # same UI as the live demo
-# train (GPU/Kaggle; writes runs.json): python train.py --data-root data
+python scripts\eval\test_eval.py             # full test @ 0.5
+python scripts\eval\auto_eval.py             # gate eval + auto_v0_probs.npz
+python scripts\eval\calib_eval.py            # ECE + reliability (job-pack #2)
+python scripts\eval\drift_check.py           # batch drift vs baseline (job-pack #13)
+python scripts\viz\gradcam.py                # visuals, fast
+python scripts\viz\report.py --demo          # sample drafts, instant
+python -m pytest test_serve.py -q            # serving tests (4)
+uvicorn serve:app --port 8000                # API
+streamlit run app.py                         # same UI as the live demo
+# train (GPU/Kaggle; writes runs.json): python scripts\train\train.py --data-root data
 ```
