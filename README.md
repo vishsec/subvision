@@ -40,9 +40,12 @@ Pre-read only. Needs radiologist sign-off. Demo / synthetic-data project, not fo
 - **Streamlit** (`app.py`, live on Streamlit Cloud): imports `serve` — UI and API are literally the same inference function. Model card + disclaimer + latency breakdown on screen.
 
 ### What to try on the live demo (probs = v0.2.0 TTA)
-- `data/test/3/9011053L.png` (KL3) → KL>=2, P ≈ 1.0000
-- `data/test/0/9003175L.png` (KL0) → KL<2, P ≈ 0.0015
-- `data/test/2/9006407R.png` (KL2, known false negative) → KL<2, P = 0.1643 (0.0925 single-pass — TTA softened the confident miss but did not fix it). The honest one.
+Live demo has a pre-loaded **example dropdown** (no download needed) — default selection is the honest miss:
+- Known false negative — `data/test/2/9006407R.png` (KL2 truth) → KL<2, P = 0.1643 (0.0925 single-pass — TTA softened the confident miss but did not fix it). The honest one.
+- Clear positive — `data/test/3/9011053L.png` (KL3) → KL>=2, P ≈ 1.0000
+- Clear negative — `data/test/0/9003175L.png` (KL0) → KL<2, P ≈ 0.0015
+- Closest miss — `data/test/2/9008884L.png` (KL2) → KL<2, p 0.46 single-pass
+- Or upload your own PNG/JPG/DICOM (upload overrides the dropdown).
 
 ## Visuals (Grad-CAM: orig | heat | overlay, FNs first)
 
@@ -68,7 +71,7 @@ All 10 saves live in `gradcam/` (fn1-5 + tp1-5, every pick KL2).
 - **Source:** Kaggle `shashwatwork/knee-osteoarthritis-dataset-with-severity` — an **OAI-derived mirror** (filenames `9xxxxxxL/R.png`; see `REF/KAGGLE_FILE` line 9). Original cohort: Osteoarthritis Initiative (NIH/NHLBI) public imaging releases.
 - **What we may publish:** trained weights, metrics, code, Grad-CAM overlays, qualitative examples — standard research/portfolio use.
 - **What we may not claim:** external validity, clinical use, demographic fairness, or exact KL grading. Single cohort only; **no second external AUC** (M4 cancelled 2026-11-05 — no data-use forms filed).
-- **Dataset terms:** respect the upstream Kaggle/OAI terms for the images themselves; do not re-host raw X-rays. This repo ships code + ONNX + small Grad-CAM PNGs, **not** the raw dataset (`data/` is gitignored).
+- **Dataset terms:** respect the upstream Kaggle/OAI terms for the images themselves; do not re-host raw X-rays. This repo ships code + ONNX + small Grad-CAM PNGs + **4 demo example X-rays** (`examples/`, ~92 KB total, the exact files the live-demo dropdown and blog reference — same class of publish as the Grad-CAM overlays, which already show these films), **not** the raw dataset (`data/` is gitignored).
 - Formal write-up: `MODEL_CARD.md` (intended use, slices, limits).
 
 ## Operating cost / hardware

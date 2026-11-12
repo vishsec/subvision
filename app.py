@@ -1,8 +1,16 @@
 import streamlit as st
+from pathlib import Path
 
 import serve
 
 BG = "https://raw.githubusercontent.com/vishsec/subvision/main/gradcam/bg_knee.png"
+
+EXAMPLES = [
+    ("Known false negative — truth KL 2, model says negative", "examples/kl2_fn_9006407R.png"),
+    ("Clear positive — truth KL 3", "examples/kl3_9011053L.png"),
+    ("Clear negative — truth KL 0", "examples/kl0_9003175L.png"),
+    ("Closest miss — truth KL 2 (p 0.46 single-pass)", "examples/kl2_fn3_9008884L.png"),
+]
 
 st.set_page_config(page_title="subvision - knee OA pre-read", layout="centered")
 
@@ -118,8 +126,19 @@ uploaded = st.file_uploader(
     help="PNG/JPG or DICOM (.dcm)",
 )
 
+st.markdown(
+    '<p class="tag" style="border:none; margin:0.4em 0 0.6em 0;">or try a pre-loaded example &mdash; same test-set files the blog uses</p>',
+    unsafe_allow_html=True,
+)
+pick = st.selectbox("Example", [label for label, _ in EXAMPLES], index=0, label_visibility="collapsed")
+
 if uploaded is not None:
     raw = uploaded.getvalue()
+else:
+    path = Path(__file__).parent / dict(EXAMPLES)[pick]
+    raw = path.read_bytes()
+
+if raw:
     with st.spinner("Running model..."):
         result = serve.predict_raw(raw)
 
