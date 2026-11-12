@@ -11,90 +11,96 @@ st.markdown(
     <style>
     .stApp {{
         background:
-            linear-gradient(rgba(0,0,0,0.87), rgba(0,0,0,0.93)),
+            linear-gradient(rgba(255,255,255,0.94), rgba(255,255,255,0.97)),
             url("{BG}") center/cover no-repeat fixed;
-        filter: grayscale(1);
     }}
     header[data-testid="stHeader"] {{ background: transparent; }}
 
     .block-container {{ padding-top: 2rem; max-width: 760px; }}
 
-    h1, p, label, .stMarkdown {{ color: #f2f2f2; }}
+    h1, p, label, .stMarkdown {{ color: #16181d; }}
 
     .hero {{
         font-size: 1.9rem; font-weight: 700; letter-spacing: 0.42em;
-        text-align: center; color: #fff; margin-bottom: 0.1em;
+        text-align: center; color: #000; margin-bottom: 0.1em;
         text-indent: 0.42em;
     }}
     .hero span {{
         display: block; font-size: 0.68rem; font-weight: 400;
-        letter-spacing: 0.58em; color: #9a9a9a; margin-top: 0.5em;
+        letter-spacing: 0.58em; color: #707070; margin-top: 0.5em;
         text-indent: 0.58em;
     }}
     .tag {{
-        text-align: center; color: #8f8f8f; font-size: 0.7rem;
+        text-align: center; color: #555; font-size: 0.7rem;
         letter-spacing: 0.18em; text-transform: uppercase;
-        border-top: 1px solid #2c2c2c; border-bottom: 1px solid #2c2c2c;
+        border-top: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0;
         padding: 0.55em 0; margin: 0.8em 0 1.5em 0;
     }}
 
     div[data-testid="stFileUploader"] section {{
-        border: 1px dashed #5a5a5a !important;
-        background: rgba(0,0,0,0.55); border-radius: 2px;
+        border: 1px dashed #b0b0b0 !important;
+        background: #fafafa; border-radius: 4px;
     }}
-    div[data-testid="stFileUploader"] section:hover {{ border-color: #fff; }}
-    div[data-testid="stFileUploader"] label {{ color: #fff !important; }}
+    div[data-testid="stFileUploader"] section:hover {{ border-color: #000; }}
+    div[data-testid="stFileUploader"] label {{ color: #16181d !important; }}
 
     .verdict {{
-        border: 1px solid #fff; padding: 0.8em 1em; text-align: center;
+        border: 2px solid #000; padding: 0.8em 1em; text-align: center;
         letter-spacing: 0.2em; font-weight: 700; font-size: 1.02rem;
-        margin: 1em 0 0.4em 0; border-radius: 2px;
+        margin: 1em 0 0.4em 0; border-radius: 4px; background: #fff; color: #000;
     }}
-    .verdict.pos {{ background: #fff; color: #000; }}
-    .verdict.neg {{ background: rgba(0,0,0,0.72); color: #fff; }}
+    .verdict.pos {{ background: #000; color: #fff; }}
+    .verdict small {{
+        display: block; font-size: 0.6rem; font-weight: 600; letter-spacing: 0.3em;
+        margin-top: 0.45em; opacity: 0.8;
+    }}
     .flag {{
-        background: repeating-linear-gradient(45deg, #fff, #fff 10px, #cfcfcf 10px, #cfcfcf 20px);
-        color: #000; text-align: center; font-weight: 700; letter-spacing: 0.16em;
-        padding: 0.55em; margin: 0.45em 0 0.15em 0; border-radius: 2px; font-size: 0.82rem;
+        background: #fff4d6; border: 1px solid #e0b040;
+        color: #7a4d00; text-align: center; font-weight: 700; letter-spacing: 0.16em;
+        padding: 0.55em; margin: 0.45em 0 0.15em 0; border-radius: 4px; font-size: 0.82rem;
     }}
 
     .prob {{
         text-align: center; font-size: 2.5rem; font-weight: 700;
-        color: #fff; letter-spacing: 0.04em; margin: 0.4em 0 0.05em 0;
+        color: #000; letter-spacing: 0.04em; margin: 0.4em 0 0.05em 0;
+    }}
+    .prob-pct {{
+        font-size: 1.15rem; font-weight: 600; color: #666;
+        letter-spacing: 0.02em; margin-left: 0.35em;
     }}
     .prob-sub {{
-        text-align: center; color: #8f8f8f; font-size: 0.68rem;
+        text-align: center; color: #666; font-size: 0.68rem;
         letter-spacing: 0.32em; text-transform: uppercase; margin-bottom: 1.1em;
     }}
     .grid {{ display: flex; gap: 8px; justify-content: center; margin-bottom: 1.1em; }}
     .cell {{
-        flex: 1; border: 1px solid #333; background: rgba(0,0,0,0.6);
-        padding: 0.55em 0.35em; text-align: center; border-radius: 2px;
+        flex: 1; border: 1px solid #e0e0e0; background: #fff;
+        padding: 0.55em 0.35em; text-align: center; border-radius: 4px;
     }}
-    .cell b {{ display: block; color: #fff; font-size: 0.92rem; word-break: break-all; }}
+    .cell b {{ display: block; color: #000; font-size: 0.92rem; word-break: break-all; }}
     .cell span {{
-        display: block; color: #7d7d7d; font-size: 0.6rem;
+        display: block; color: #888; font-size: 0.6rem;
         letter-spacing: 0.2em; text-transform: uppercase; margin-top: 0.25em;
     }}
 
     .disc {{
-        border: 1px solid #3a3a3a; background: rgba(0,0,0,0.66);
-        color: #bdbdbd; font-size: 0.76rem; letter-spacing: 0.05em;
-        padding: 0.7em 0.9em; margin-top: 1.3em; border-radius: 2px;
+        border: 1px solid #e2e2e2; background: #f6f6f6;
+        color: #444; font-size: 0.76rem; letter-spacing: 0.05em;
+        padding: 0.7em 0.9em; margin-top: 1.3em; border-radius: 4px;
     }}
 
     [data-testid="stExpander"] {{
-        border: 1px solid #2e2e2e; background: rgba(0,0,0,0.55); border-radius: 2px;
+        border: 1px solid #e4e4e4; background: #fafafa; border-radius: 4px;
     }}
-    [data-testid="stExpander"] summary {{ color: #dcdcdc; letter-spacing: 0.1em; }}
+    [data-testid="stExpander"] summary {{ color: #16181d; letter-spacing: 0.1em; }}
 
     .stButton > button {{
-        background: #000; color: #fff; border: 1px solid #fff; border-radius: 2px;
+        background: #000; color: #fff; border: 1px solid #000; border-radius: 4px;
         letter-spacing: 0.15em;
     }}
-    .stButton > button:hover {{ background: #fff; color: #000; }}
+    .stButton > button:hover {{ background: #fff; color: #000; border: 1px solid #000; }}
 
-    [data-testid="stSpinner"] > div {{ border-top-color: #fff; }}
+    [data-testid="stSpinner"] > div {{ border-top-color: #000; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -121,9 +127,11 @@ if uploaded is not None:
     pos = result["label"].startswith("KL>=")
     border = result.get("uncertainty") == "borderline"
     label = result["label"].replace(">=", "\u2265").replace("<", "\u003c")
+    conf = (prob if pos else 1 - prob) * 100  # confidence of the PREDICTED class
 
     st.markdown(
-        f'<div class="verdict {"pos" if pos else "neg"}">{label}</div>',
+        f'<div class="verdict {"pos" if pos else "neg"}">{label}'
+        f"<small>{conf:.1f}% CONFIDENCE</small></div>",
         unsafe_allow_html=True,
     )
     if border:
@@ -132,17 +140,21 @@ if uploaded is not None:
             unsafe_allow_html=True,
         )
 
-    st.markdown(f'<div class="prob">{prob:.4f}</div>', unsafe_allow_html=True)
     st.markdown(
-        f'<div class="prob-sub">P(KL &ge; 2) &middot; threshold {result["threshold"]}</div>',
+        f'<div class="prob">{prob:.4f}<span class="prob-pct">({prob * 100:.1f}%)</span></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="prob-sub">probability of osteoarthritis (KL &ge; 2) &middot; threshold {result["threshold"]}</div>',
         unsafe_allow_html=True,
     )
 
     lat = result["latency_ms"]
+    fmt = "DICOM" if result["input_format"] == "DICOM" else "PNG / JPG"
     st.markdown(
         f"""
         <div class="grid">
-          <div class="cell"><b>{result["input_format"]}</b><span>input</span></div>
+          <div class="cell"><b>{fmt}</b><span>input</span></div>
           <div class="cell"><b>{lat["total"]:.0f} ms</b><span>latency</span></div>
           <div class="cell"><b>{result.get("tta", "-")}</b><span>tta</span></div>
           <div class="cell"><b>{result.get("model_version", "?")}</b><span>model</span></div>
